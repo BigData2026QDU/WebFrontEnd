@@ -4,9 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>前端模块示例 - 自动主题切换</title>
-  <link rel="stylesheet" href="css/theme.css">
-  <link rel="stylesheet" href="css/report.css">
-  <link rel="stylesheet" href="css/request-capsule.css">
+  <link rel="stylesheet" href="../css/theme.css">
+  <link rel="stylesheet" href="../css/report.css">
+  <link rel="stylesheet" href="../css/request-capsule.css">
 </head>
 <body>
   <div class="container">
@@ -20,7 +20,7 @@
       <h2>使用方法</h2>
       <p>在 HTML 中引入主题管理器即可：</p>
       <div class="theme-info">
-        <pre><code>&lt;script src="js/theme-manager.js"&gt;&lt;/script&gt;</code></pre>
+        <pre><code>&lt;script src="../js/theme-manager.js"&gt;&lt;/script&gt;</code></pre>
       </div>
       <p>无需编写额外代码。</p>
     </div>
@@ -30,7 +30,7 @@
       <p>通过 data 属性传递配置：</p>
       <div class="theme-info">
         <pre><code>&lt;script 
-  src="js/theme-manager.js"
+  src="../js/theme-manager.js"
   data-day-start="7"
   data-night-start="19"
   data-interval="30000"
@@ -74,7 +74,7 @@ themeManager.clearSavedTheme();</code></pre>
         <pre><code>&lt;button id="myThemeButton"&gt;切换主题&lt;/button&gt;
 
 &lt;script 
-  src="js/theme-manager.js"
+  src="../js/theme-manager.js"
   data-button-selector="#myThemeButton"
 &gt;&lt;/script&gt;</code></pre>
       </div>
@@ -108,12 +108,12 @@ themeManager.clearSavedTheme();</code></pre>
   <!-- 脚本 -->
   <script src="https://cdn.bootcdn.net/ajax/libs/echarts/6.0.0/echarts.min.js"></script>
   <script src="https://cdn.bootcdn.net/ajax/libs/axios/1.9.0/axios.min.js"></script>
-  <script src="js/api.js"></script>
-  <script src="js/request.js"></script>
-  <script src="js/chart-parser.js"></script>
-  <script src="js/chart-factory.js"></script>
-  <script src="js/report-renderer.js"></script>
-  <script src="js/theme-manager.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/request.js"></script>
+  <script src="../js/chart-parser.js"></script>
+  <script src="../js/chart-factory.js"></script>
+  <script src="../js/report-renderer.js"></script>
+  <script src="../js/theme-manager.js"></script>
 
   <script>
     document.addEventListener('DOMContentLoaded', () => {
@@ -211,3 +211,4 @@ themeManager.clearSavedTheme();</code></pre>
   </script>
 </body>
 </html>
+
