@@ -1,0 +1,37 @@
+.login-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background: var(--bg-color);
+}
+
+.login-card {
+    width: 100%;
+    max-width: 400px;
+    padding: var(--spacing-lg);
+}
+
+.login-card h1 {
+    text-align: center;
+    margin-bottom: var(--spacing-lg);
+    color: var(--primary-color);
+}
+
+.login-card .form-group {
+    margin-bottom: var(--spacing-md);
+}
+
+.login-card .btn {
+    width: 100%;
+    padding: 12px;
+}
+
+.login-card .links {
+    text-align: center;
+    margin-top: var(--spacing-md);
+}
+
+.login-card .links a {
+    color: var(--primary-color);
+}

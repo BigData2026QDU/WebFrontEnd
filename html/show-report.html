@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>报告展示 - HiveHBase</title>
+    <link rel="stylesheet" href="css/theme.css">
+    <link rel="stylesheet" href="css/report.css">
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>HiveHBase 报告中心</h1>
+            <button id="themeToggle" class="btn">切换主题</button>
+        </header>
+        
+        <main>
+            <div id="reportList" class="card">
+                <h2>报告列表</h2>
+                <ul class="report-list" id="reportItems"></ul>
+            </div>
+            
+            <div id="reportContent" class="card" style="display: none;">
+                <h2 id="reportTitle"></h2>
+                <div id="reportSections"></div>
+            </div>
+        </main>
+    </div>
+
+    <script src="js/theme-manager.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/chart-factory.js"></script>
+    <script src="js/report-renderer.js"></script>
+    <script>
+        let currentReport = null;
+        
+        document.getElementById('themeToggle').addEventListener('click', () => {
+            ThemeManager.toggle();
+        });
+        
+        async function loadReportList() {
+            try {
+                const response = await window.apiService.get('/reports');
+                const reports = response.data.data;
+                const listEl = document.getElementById('reportItems');
+                listEl.innerHTML = '';
+                
+                reports.forEach(report => {
+                    const li = document.createElement('li');
+                    li.textContent = `报告 ${report.bindex} - ${report.firstText || '无摘要'}`;
+                    li.onclick = () => loadReport(report.bindex);
+                    listEl.appendChild(li);
+                });
+            } catch (error) {
+                console.error('加载报告列表失败:', error);
+            }
+        }
+        
+        async function loadReport(bindex) {
+            try {
+                const response = await window.apiService.get(`/reports/${bindex}`);
+                currentReport = response.data.data;
+                
+                document.getElementById('reportTitle').textContent = currentReport.title;
+                document.getElementById('reportSections').innerHTML = '';
+                
+                ReportRenderer.render(document.getElementById('reportSections'), currentReport.sections);
+                
+                document.getElementById('reportList').style.display = 'none';
+                document.getElementById('reportContent').style.display = 'block';
+            } catch (error) {
+                console.error('加载报告失败:', error);
+            }
+        }
+        
+        loadReportList();
+    </script>
+</body>
+</html>

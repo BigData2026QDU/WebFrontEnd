@@ -1,0 +1,16 @@
+{
+  "name": "hivehbase-web",
+  "version": "1.0.0",
+  "description": "HiveHBase 大数据分析前端",
+  "scripts": {
+    "check:structure": "node scripts/check-structure.mjs",
+    "test": "node scripts/run-tests.mjs",
+    "test:unit": "node scripts/run-tests.mjs unit",
+    "test:integration": "node scripts/run-tests.mjs integration",
+    "test:e2e": "node scripts/run-tests.mjs e2e",
+    "ci": "npm run check:structure && npm run test"
+  },
+  "keywords": ["bigdata", "hive", "hbase", "visualization"],
+  "author": "BigData2026QDU",
+  "license": "MIT"
+}
