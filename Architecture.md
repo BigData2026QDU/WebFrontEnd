@@ -1,60 +1,99 @@
 # 架构文档
 
-## 1. 整体架构
+## 1. 整体结构
 
 ```mermaid
 graph TB
-    subgraph "前端层"
-        A[HTML 页面] --> B[CSS 样式]
-        A --> C[JavaScript 模块]
+    subgraph 页面层
+        HTML[html/*.html]
+        CSS[css/*.css]
     end
 
-    subgraph "JS 模块"
-        C --> D[api.js - Axios 封装]
-        C --> E[theme-manager.js - 主题切换]
-        C --> F[chart-factory.js - ECharts 图表]
-        C --> G[report-renderer.js - 报告渲染]
+    subgraph 浏览器逻辑层
+        API[api.js / request.js]
+        THEME[theme-manager.js]
+        CHART[chart-parser.js / chart-factory.js]
+        REPORT[report-renderer.js / blog-editor.js]
     end
 
-    subgraph "通信层"
-        D --> H[后端 Servlet API]
+    subgraph 后端接口层
+        SERVLET[Servlet API]
     end
+
+    subgraph 仓库内验证层
+        STRUCTURE[scripts/check-structure.mjs]
+        RUNNER[scripts/run-tests.mjs]
+        TESTS[tests/unit + integration + e2e]
+        CI[.github/workflows/ci.yml]
+    end
+
+    HTML --> API
+    HTML --> THEME
+    HTML --> CHART
+    HTML --> REPORT
+    CSS --> HTML
+    API --> SERVLET
+    STRUCTURE --> CI
+    RUNNER --> CI
+    TESTS --> RUNNER
 ```
 
 ## 2. 核心模块
 
-### 2.1 api.js - 网络请求模块
-- 统一的 Axios 封装
-- 请求拦截和响应拦截
-- 请求胶囊 UI 反馈
+### 2.1 `api.js`
 
-### 2.2 theme-manager.js - 主题模块
-- 日间/夜间自动切换
-- 手动切换支持
-- localStorage 持久化
+- 统一创建 Axios 实例
+- 自动推导部署根路径
+- 管理请求胶囊 UI
+- 暴露 `window.resolveAppUrl()` 供页面拼接应用内地址
 
-### 2.3 chart-factory.js - 图表模块
-- ECharts 配置生成
-- 支持 bar/line/pie/scatter/mix 类型
-- 智能双 Y 轴检测
+### 2.2 `request.js`
 
-### 2.4 report-renderer.js - 报告渲染
-- sections 驱动的报告渲染
-- 文本和图表混合展示
+- 对 `GET / POST / PUT / DELETE` 做轻量封装
+- 统一为请求注入 `requestName`
 
-## 3. 数据流向
+### 2.3 `theme-manager.js`
 
+- 初次加载时跟随系统主题
+- 用户手动切换后持久化到 `localStorage`
+- 系统主题变化时，仅在没有手动偏好时自动跟随
+
+### 2.4 图表与报告模块
+
+- `chart-parser.js`：把表格型数据转换成图表维度 / 系列
+- `chart-factory.js`：按图表类型生成 ECharts 配置
+- `report-renderer.js`：将分段报告渲染到页面
+- `blog-editor.js`：报告编辑交互逻辑
+
+## 3. 数据流
+
+```text
+用户操作
+  -> HTML 事件
+  -> 浏览器脚本
+  -> api.js / request.js
+  -> Servlet API
+  -> JSON 响应
+  -> 页面渲染 / 主题更新 / 图表刷新
 ```
-用户操作 → JavaScript 事件 → api.js → 后端 API → JSON 响应 → 渲染更新
-```
 
-## 4. 技术选型
+## 4. 测试与校验设计
 
-| 技术 | 用途 |
-|------|------|
-| HTML5 | 页面结构 |
-| CSS3 | 样式和主题 |
-| JavaScript ES6+ | 交互逻辑 |
-| Axios | HTTP 请求 |
-| ECharts | 数据可视化 |
-| GSAP | 动画效果 |
+### 4.1 结构检查
+
+`scripts/check-structure.mjs` 负责检查：
+
+- 核心目录和文档是否存在
+- `package.json` 脚本是否指向真实入口
+- HTML 中的本地资源引用是否存在
+- 仓库内是否重新引入已删除的前端测试骨架或无关模块
+
+### 4.2 Node 内建测试
+
+- `tests/unit/`：纯逻辑测试，覆盖 `ChartParser` 和 `ThemeManager`
+- `tests/integration/`：构造轻量浏览器桩环境，验证 `api.js`
+- `tests/e2e/`：对 HTML 页面做资源与基本文档结构冒烟检查
+
+### 4.3 CI 责任边界
+
+当前前端仓库 CI 只验证当前仓库内容本身，不依赖外部前端测试骨架，也不负责后端发布。
