@@ -4,7 +4,42 @@
     return;
   }
 
-  const BASE_URL = window.API_BASE_URL || '';
+  function normalizeBasePath(basePath) {
+    if (!basePath || basePath === '/') {
+      return '';
+    }
+    return basePath.replace(/\/+$/, '');
+  }
+
+  function detectBasePath() {
+    const pathname = (window.location && window.location.pathname) ? window.location.pathname : '';
+    if (!pathname || pathname === '/') {
+      return '';
+    }
+
+    const cleanPath = pathname.endsWith('/') && pathname.length > 1
+      ? pathname.slice(0, -1)
+      : pathname;
+
+    const htmlIndex = cleanPath.indexOf('/html/');
+    if (htmlIndex >= 0) {
+      return cleanPath.substring(0, htmlIndex);
+    }
+
+    const lastSlash = cleanPath.lastIndexOf('/');
+    if (lastSlash > 0) {
+      return cleanPath.substring(0, lastSlash);
+    }
+
+    return '';
+  }
+
+  const BASE_URL = normalizeBasePath(window.API_BASE_URL || detectBasePath());
+  window.apiBasePath = BASE_URL;
+  window.resolveAppUrl = function(path) {
+    const normalizedPath = !path ? '' : (path.startsWith('/') ? path : `/${path}`);
+    return `${BASE_URL}${normalizedPath}`;
+  };
   let activeRequests = 0;
   const MAX_DISPLAYED_REQUESTS = 3;
 

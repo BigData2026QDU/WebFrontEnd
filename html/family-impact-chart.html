@@ -184,6 +184,22 @@
     let chartInstance = null;
     let currentData = null;
 
+    function resolveAppUrl(path) {
+      const pathname = window.location.pathname || '';
+      let basePath = '';
+
+      const htmlIndex = pathname.indexOf('/html/');
+      if (htmlIndex >= 0) {
+        basePath = pathname.substring(0, htmlIndex);
+      } else {
+        const lastSlash = pathname.lastIndexOf('/');
+        basePath = lastSlash > 0 ? pathname.substring(0, lastSlash) : '';
+      }
+
+      const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+      return `${basePath}${normalizedPath}`;
+    }
+
     // 获取主题颜色
     function getThemeColors() {
       const style = getComputedStyle(document.documentElement);
@@ -213,7 +229,14 @@
 
       try {
         // 调用后端API，添加table参数
-        const response = await fetch(`api/chart/family-impact?table=${tableName}&chartType=${chartType}&limit=${limit}`);
+        const url = new URL(resolveAppUrl('/api/chart/family-impact'), window.location.origin);
+        url.searchParams.set('table', tableName);
+        url.searchParams.set('chartType', chartType);
+        url.searchParams.set('limit', limit);
+
+        const response = await fetch(url.toString(), {
+          credentials: 'same-origin'
+        });
         const result = await response.json();
 
         if (result.code !== 200) {

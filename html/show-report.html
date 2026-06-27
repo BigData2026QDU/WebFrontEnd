@@ -42,7 +42,7 @@
         
         async function loadReportList() {
             try {
-                const response = await window.apiService.get('/reports');
+                const response = await window.apiService.get('reports');
                 const reports = response.data.data;
                 const listEl = document.getElementById('reportItems');
                 listEl.innerHTML = '';
@@ -60,7 +60,7 @@
         
         async function loadReport(bindex) {
             try {
-                const response = await window.apiService.get(`/reports/${bindex}`);
+                const response = await window.apiService.get(`reports/${bindex}`);
                 currentReport = response.data.data;
                 
                 document.getElementById('reportTitle').textContent = currentReport.title;
