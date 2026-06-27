@@ -37,6 +37,9 @@ async function collectFiles(dir) {
   for (const entry of entries) {
     const fullPath = path.join(dir, entry.name);
     if (entry.isDirectory()) {
+      if (entry.name === 'AGENTS') {
+        continue;
+      }
       files.push(...await collectFiles(fullPath));
     } else {
       files.push(fullPath);
