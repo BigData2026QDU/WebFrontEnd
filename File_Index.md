@@ -9,6 +9,7 @@
 | `File_Index.md` | 文件索引 | 当前文件 |
 | `STYLE_GUIDE.md` | 风格规范 | 前端开发约束 |
 | `package.json` | npm 脚本 | 结构检查、测试、CI 入口 |
+| `index.html` | 根路径入口 | 跳转到 `html/login.html`，保证相对 CSS/JS 路径按 `html/` 页面位置解析 |
 | `.github/workflows/ci.yml` | GitHub Actions | 仓库内直接执行前端检查与测试 |
 
 ## CSS 文件
@@ -63,5 +64,5 @@
 
 | 文件路径 | 作用 | 说明 |
 |---------|------|------|
-| `WEB-INF/web.xml` | Web 配置 | Servlet / Filter 映射 |
+| `WEB-INF/web.xml` | Web 配置 | 将 `index.html` 作为欢迎页 |
 | `.gitmodules` | 子模块配置 | 维护 `AGENTS` 子模块 |

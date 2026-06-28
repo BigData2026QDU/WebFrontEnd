@@ -5,6 +5,7 @@
 ```mermaid
 graph TB
     subgraph 页面层
+        ENTRY[index.html]
         HTML[html/*.html]
         CSS[css/*.css]
     end
@@ -27,6 +28,7 @@ graph TB
         CI[.github/workflows/ci.yml]
     end
 
+    ENTRY --> HTML
     HTML --> API
     HTML --> THEME
     HTML --> CHART
@@ -40,25 +42,31 @@ graph TB
 
 ## 2. 核心模块
 
-### 2.1 `api.js`
+### 2.1 `index.html`
+
+- 作为 Web 容器欢迎页
+- 将应用根路径跳转到 `html/login.html`
+- 避免直接从 `/hivehbase/` 加载页面时 `../css`、`../js` 等相对路径解析到应用外层
+
+### 2.2 `api.js`
 
 - 统一创建 Axios 实例
 - 自动推导部署根路径
 - 管理请求胶囊 UI
 - 暴露 `window.resolveAppUrl()` 供页面拼接应用内地址
 
-### 2.2 `request.js`
+### 2.3 `request.js`
 
 - 对 `GET / POST / PUT / DELETE` 做轻量封装
 - 统一为请求注入 `requestName`
 
-### 2.3 `theme-manager.js`
+### 2.4 `theme-manager.js`
 
 - 初次加载时跟随系统主题
 - 用户手动切换后持久化到 `localStorage`
 - 系统主题变化时，仅在没有手动偏好时自动跟随
 
-### 2.4 图表与报告模块
+### 2.5 图表与报告模块
 
 - `chart-parser.js`：把表格型数据转换成图表维度 / 系列
 - `chart-factory.js`：按图表类型生成 ECharts 配置
