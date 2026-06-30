@@ -30,8 +30,8 @@
 | `js/theme-manager.js` | 主题管理 | 跟随系统主题、持久化用户手动偏好 |
 | `js/chart-parser.js` | 图表解析 | 表格数据转图表维度 / 系列 |
 | `js/chart-factory.js` | 图表工厂 | 构造 ECharts 配置 |
-| `js/report-renderer.js` | 报告渲染 | 渲染文本 / 图表分段 |
-| `js/blog-editor.js` | 编辑器逻辑 | 报告编辑页面交互 |
+| `js/report-renderer.js` | 报告渲染 | 渲染文本 / 图表分段，并支持按块局部替换 |
+| `js/blog-editor.js` | 编辑器逻辑 | 报告编辑页面交互与实时块开关 |
 
 ## HTML 页面
 
@@ -56,6 +56,7 @@
 | `scripts/run-tests.mjs` | 测试入口 | 按 `unit / integration / e2e` 调度 Node 测试 |
 | `tests/helpers/browser-env.mjs` | 浏览器桩环境 | 提供 DOM、localStorage、matchMedia、Axios stub |
 | `tests/unit/chart-parser.test.mjs` | 单元测试 | 覆盖 `ChartParser` |
+| `tests/unit/report-renderer.test.mjs` | 单元测试 | 覆盖报告块实时元数据和局部替换 |
 | `tests/unit/theme-manager.test.mjs` | 单元测试 | 覆盖主题初始化、跟随系统、手动持久化 |
 | `tests/integration/api.test.mjs` | 集成测试 | 覆盖 `api.js` base path 与请求胶囊 |
 | `tests/e2e/html-smoke.test.mjs` | 冒烟测试 | 检查 HTML 标题、编码和本地资源引用 |

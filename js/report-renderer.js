@@ -27,6 +27,9 @@
       this.statusElement = options.statusElement || null;
       this.requestFactory = options.requestFactory || ((reportId) => new Request(`加载报告:${reportId}`, `reports/${reportId}`));
       this.chartInstances = [];
+      this.blockElements = new Map();
+      this.currentBlocks = [];
+      this.currentReport = null;
 
       if (!this.container) {
         throw new Error('ReportRenderer 需要传入 container DOM 节点。');
@@ -157,6 +160,9 @@
       }
 
       this.disposeCharts();
+      this.blockElements.clear();
+      this.currentBlocks = [];
+      this.currentReport = report;
       this.container.innerHTML = '';
 
       const wrapper = document.createElement('div');
@@ -170,8 +176,16 @@
 
       // 2. 内容块：统一转为 [{type, data}] 再渲染（不再按旧结构渲染 metrics/notes 等复杂结构）
       const blocks = this.normalizeToBlocks(report);
+      this.currentBlocks = blocks.slice();
       if (blocks.length > 0) {
-        blocks.forEach(block => wrapper.appendChild(this.buildBlock(block)));
+        blocks.forEach(block => {
+          const blockEl = this.buildBlock(block);
+          wrapper.appendChild(blockEl);
+          const key = this.getBlockKey(block);
+          if (key) {
+            this.blockElements.set(key, blockEl);
+          }
+        });
       } else {
         const empty = document.createElement('div');
         empty.className = 'empty-state';
@@ -197,7 +211,7 @@
         if (hasTyped) {
           sections.forEach(s => {
             if (!s || typeof s !== 'object') return;
-            blocks.push({ type: s.type, data: s.data });
+            blocks.push(this.normalizeBlock(s));
           });
           return blocks;
         }
@@ -205,7 +219,7 @@
         // 2) 兼容：sections 如果是字符串数组，当作纯文本段落数组
         const allStrings = sections.every(s => typeof s === 'string');
         if (allStrings) {
-          sections.forEach(text => blocks.push({ type: 'text', data: text }));
+          sections.forEach(text => blocks.push(this.normalizeBlock({ type: 'text', data: text })));
           return blocks;
         }
 
@@ -233,7 +247,7 @@
           if (section.code) lines.push(String(section.code));
           if (section.quote) lines.push(String(section.quote));
 
-          lines.forEach(t => blocks.push({ type: 'text', data: t }));
+          lines.forEach(t => blocks.push(this.normalizeBlock({ type: 'text', data: t })));
         });
       }
 
@@ -241,14 +255,14 @@
       if (Array.isArray(report.charts)) {
         report.charts.forEach(chart => {
           if (!chart || typeof chart !== 'object') return;
-          blocks.push({ type: 'chart', data: chart });
+          blocks.push(this.normalizeBlock({ type: 'chart', data: chart }));
         });
       }
 
       // 5) 兼容：notes 降级为纯文本段落
       if (Array.isArray(report.notes)) {
         report.notes.forEach(t => {
-          if (t != null && String(t).trim() !== '') blocks.push({ type: 'text', data: String(t) });
+          if (t != null && String(t).trim() !== '') blocks.push(this.normalizeBlock({ type: 'text', data: String(t) }));
         });
       }
 
@@ -258,11 +272,76 @@
           if (!m || typeof m !== 'object') return;
           const label = m.label != null ? String(m.label) : '指标';
           const value = m.value != null ? String(m.value) : '-';
-          blocks.push({ type: 'text', data: `${label}: ${value}` });
+          blocks.push(this.normalizeBlock({ type: 'text', data: `${label}: ${value}` }));
         });
       }
 
       return blocks;
+    }
+
+    normalizeBlock(block) {
+      const normalized = {
+        type: block && block.type ? String(block.type).toLowerCase() : 'text',
+        data: block ? block.data : null,
+        id: block && block.id != null ? block.id : (block && block.bid != null ? block.bid : null),
+        paragraph: block && block.paragraph != null ? block.paragraph : null,
+        realtime: !!(block && block.realtime),
+        refreshIntervalMs: this.normalizeRefreshInterval(block && block.refreshIntervalMs),
+        query: block && typeof block === 'object' ? (block.query || null) : null
+      };
+
+      if (!normalized.realtime) {
+        normalized.refreshIntervalMs = null;
+      } else if (!normalized.refreshIntervalMs) {
+        normalized.refreshIntervalMs = 1000;
+      }
+
+      return normalized;
+    }
+
+    normalizeRefreshInterval(value) {
+      const parsed = parseInt(value, 10);
+      if (!Number.isFinite(parsed) || parsed <= 0) {
+        return null;
+      }
+      return parsed;
+    }
+
+    getBlockKey(block) {
+      if (!block || block.id == null || block.id === '') {
+        return null;
+      }
+      return String(block.id);
+    }
+
+    getRealtimeBlocks() {
+      return this.currentBlocks
+        .filter(block => block && block.realtime && this.getBlockKey(block))
+        .map(block => ({ ...block }));
+    }
+
+    replaceBlock(nextBlock) {
+      const normalized = this.normalizeBlock(nextBlock);
+      const key = this.getBlockKey(normalized);
+      if (!key) {
+        return false;
+      }
+
+      const currentEl = this.blockElements.get(key);
+      if (!currentEl || !currentEl.parentNode || !currentEl.parentNode.replaceChild) {
+        return false;
+      }
+
+      const nextEl = this.buildBlock(normalized);
+      this.disposeChartsForBlock(key);
+      currentEl.parentNode.replaceChild(nextEl, currentEl);
+      this.blockElements.set(key, nextEl);
+
+      const index = this.currentBlocks.findIndex(block => this.getBlockKey(block) === key);
+      if (index >= 0) {
+        this.currentBlocks[index] = normalized;
+      }
+      return true;
     }
 
     /**
@@ -271,22 +350,24 @@
     buildBlock(block) {
       const type = block && typeof block === 'object' ? String(block.type || '').toLowerCase() : '';
       const data = block && typeof block === 'object' ? block.data : null;
+      let rendered;
 
       if (type === 'text') {
-        return this.buildTextBlock(data);
+        rendered = this.buildTextBlock(data);
+      } else if (type === 'chart') {
+        rendered = this.buildChartBlock(data, block);
+      } else {
+        const fallback = document.createElement('div');
+        fallback.className = 'report-section content-section';
+        const p = document.createElement('p');
+        p.className = 'section-paragraph';
+        p.textContent = `未知内容块类型：${type || '(empty)'}，已跳过渲染。`;
+        fallback.appendChild(p);
+        rendered = fallback;
       }
 
-      if (type === 'chart') {
-        return this.buildChartBlock(data);
-      }
-
-      const fallback = document.createElement('div');
-      fallback.className = 'report-section content-section';
-      const p = document.createElement('p');
-      p.className = 'section-paragraph';
-      p.textContent = `未知内容块类型：${type || '(empty)'}，已跳过渲染。`;
-      fallback.appendChild(p);
-      return fallback;
+      this.decorateBlock(rendered, block);
+      return rendered;
     }
 
     buildTextBlock(data) {
@@ -303,7 +384,7 @@
           block.appendChild(p);
         });
 
-      if (!block.childNodes.length) {
+      if (!block.children.length) {
         const p = document.createElement('p');
         p.className = 'section-paragraph';
         p.textContent = '';
@@ -313,7 +394,7 @@
       return block;
     }
 
-    buildChartBlock(data) {
+    buildChartBlock(data, blockMeta) {
       const block = document.createElement('div');
       block.className = 'report-section';
 
@@ -323,10 +404,10 @@
       charts
         .filter(c => c && typeof c === 'object')
         .forEach(chart => {
-          block.appendChild(this.buildChart(chart));
+          block.appendChild(this.buildChart(chart, blockMeta));
         });
 
-      if (!block.childNodes.length) {
+      if (!block.children.length) {
         const empty = document.createElement('div');
         empty.className = 'empty-state';
         empty.textContent = '图表数据为空，无法渲染。';
@@ -334,6 +415,27 @@
       }
 
       return block;
+    }
+
+    decorateBlock(blockEl, blockMeta) {
+      const key = this.getBlockKey(blockMeta);
+      if (key) {
+        blockEl.setAttribute('data-block-id', key);
+      }
+      if (!blockMeta || !blockMeta.realtime) {
+        return;
+      }
+
+      const badgeRow = document.createElement('div');
+      badgeRow.className = 'report-header';
+      badgeRow.style.marginBottom = '12px';
+
+      const badge = document.createElement('span');
+      badge.className = 'report-badge';
+      badge.textContent = '实时';
+      badgeRow.appendChild(badge);
+
+      blockEl.insertBefore ? blockEl.insertBefore(badgeRow, blockEl.firstChild) : blockEl.appendChild(badgeRow);
     }
 
     /**
@@ -369,7 +471,9 @@
         const label = document.createElement('strong');
         label.textContent = '更新时间：';
         m.appendChild(label);
-        m.appendChild(document.createTextNode(report.updatedAt));
+        const value = document.createElement('span');
+        value.textContent = report.updatedAt;
+        m.appendChild(value);
         meta.appendChild(m);
       }
 
@@ -378,7 +482,9 @@
         const label = document.createElement('strong');
         label.textContent = '数据源：';
         s.appendChild(label);
-        s.appendChild(document.createTextNode(report.source));
+        const value = document.createElement('span');
+        value.textContent = report.source;
+        s.appendChild(value);
         meta.appendChild(s);
       }
 
@@ -387,7 +493,9 @@
         const label = document.createElement('strong');
         label.textContent = '区间：';
         r.appendChild(label);
-        r.appendChild(document.createTextNode(report.range));
+        const value = document.createElement('span');
+        value.textContent = report.range;
+        r.appendChild(value);
         meta.appendChild(r);
       }
 
@@ -511,7 +619,7 @@
     /**
      * 构建图表（支持新旧格式）
      */
-    buildChart(chart) {
+    buildChart(chart, blockMeta) {
       const chartBlock = document.createElement('div');
       chartBlock.className = 'chart-block';
 
@@ -546,7 +654,13 @@
             const instance = echarts.init(canvas);
             const option = this.buildChartOption(chart);
             instance.setOption(option);
-            this.chartInstances.push({ instance, chart, canvas, typeSelector });
+            this.chartInstances.push({
+              instance,
+              chart,
+              canvas,
+              typeSelector,
+              blockKey: this.getBlockKey(blockMeta)
+            });
           } catch (error) {
             console.error('图表渲染失败:', error);
             const errorMsg = document.createElement('div');
@@ -722,10 +836,32 @@
       this.chartInstances = [];
     }
 
+    disposeChartsForBlock(blockKey) {
+      if (!blockKey) {
+        return;
+      }
+
+      const remain = [];
+      this.chartInstances.forEach(chartInfo => {
+        if (chartInfo.blockKey === blockKey) {
+          if (chartInfo.instance && chartInfo.instance.dispose) {
+            chartInfo.instance.dispose();
+          }
+          return;
+        }
+        remain.push(chartInfo);
+      });
+      this.chartInstances = remain;
+    }
+
     /**
      * 渲染空状态
      */
     renderEmpty() {
+      this.disposeCharts();
+      this.blockElements.clear();
+      this.currentBlocks = [];
+      this.currentReport = null;
       this.container.innerHTML = '';
       const empty = document.createElement('div');
       empty.className = 'empty-state';
@@ -737,6 +873,9 @@
      * 渲染错误状态
      */
     renderError(error) {
+      this.disposeCharts();
+      this.blockElements.clear();
+      this.currentBlocks = [];
       this.container.innerHTML = '';
       const err = document.createElement('div');
       err.className = 'error-state';
@@ -745,7 +884,8 @@
       title.textContent = '加载失败：';
       err.appendChild(title);
 
-      const msg = document.createTextNode(error && error.message ? error.message : '未知错误');
+      const msg = document.createElement('span');
+      msg.textContent = error && error.message ? error.message : '未知错误';
       err.appendChild(msg);
 
       this.container.appendChild(err);

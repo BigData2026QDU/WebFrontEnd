@@ -214,6 +214,7 @@
             ...b,
             type,
             content,
+            realtime: !!b.realtime,
             _id: Date.now() + Math.random()
           };
 
@@ -240,6 +241,7 @@
       const block = {
         type: type,
         content: '',
+        realtime: false,
         _table: '',
         _columns: [],
         _chartType: 'bar',
@@ -296,6 +298,22 @@
             const controls = document.createElement('div');
             controls.className = 'block-controls';
 
+            const realtimeLabel = document.createElement('label');
+            realtimeLabel.style.cssText = 'display:inline-flex; align-items:center; gap:6px; margin-right:8px; font-size:12px; color: var(--text-secondary);';
+
+            const realtimeInput = document.createElement('input');
+            realtimeInput.type = 'checkbox';
+            realtimeInput.checked = !!block.realtime;
+            realtimeInput.addEventListener('change', (e) => {
+                block.realtime = !!e.target.checked;
+            });
+
+            const realtimeText = document.createElement('span');
+            realtimeText.textContent = '实时';
+
+            realtimeLabel.appendChild(realtimeInput);
+            realtimeLabel.appendChild(realtimeText);
+
             const upBtn = document.createElement('button');
             upBtn.textContent = '↑';
             upBtn.disabled = index === 0;
@@ -314,6 +332,7 @@
                 }
             });
 
+            controls.appendChild(realtimeLabel);
             controls.appendChild(upBtn);
             controls.appendChild(downBtn);
             controls.appendChild(deleteBtn);
@@ -594,9 +613,9 @@
         .map(b => {
           if (b.type === 'chart') {
             const spec = this.buildChartSpec(b._table || '', b._columns || [], b._chartType || 'bar');
-            return { type: 'chart', content: spec };
+            return { type: 'chart', content: spec, realtime: !!b.realtime };
           }
-          return { type: 'text', content: b.content || '' };
+          return { type: 'text', content: b.content || '', realtime: !!b.realtime };
         })
         .filter(b => b.content && b.content.trim());
 
@@ -679,8 +698,8 @@
             }
 
             try {
-                const req = new Request('加载报告预览', `api/report-test`);
-                const resp = await req.get({ bindex: this.currentBindex });
+                const req = new Request('加载报告预览', `reports/${this.currentBindex}`);
+                const resp = await req.get({ refresh: 1 });
                 const report = resp.data;
 
                 // 显示预览模态框

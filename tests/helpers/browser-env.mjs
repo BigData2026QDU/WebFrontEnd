@@ -35,8 +35,28 @@ class MockElement {
           this._classes.delete(className);
         }
       },
+      toggle: (className, force) => {
+        if (force === true) {
+          this._classes.add(className);
+          return true;
+        }
+        if (force === false) {
+          this._classes.delete(className);
+          return false;
+        }
+        if (this._classes.has(className)) {
+          this._classes.delete(className);
+          return false;
+        }
+        this._classes.add(className);
+        return true;
+      },
       contains: className => this._classes.has(className)
     };
+  }
+
+  get firstChild() {
+    return this.children[0] ?? null;
   }
 
   setAttribute(name, value) {
@@ -59,10 +79,36 @@ class MockElement {
     return child;
   }
 
+  insertBefore(child, referenceNode) {
+    child.parentNode = this;
+    if (!referenceNode) {
+      this.children.push(child);
+      return child;
+    }
+    const index = this.children.indexOf(referenceNode);
+    if (index < 0) {
+      this.children.push(child);
+      return child;
+    }
+    this.children.splice(index, 0, child);
+    return child;
+  }
+
   prepend(child) {
     child.parentNode = this;
     this.children.unshift(child);
     return child;
+  }
+
+  replaceChild(newChild, oldChild) {
+    const index = this.children.indexOf(oldChild);
+    if (index < 0) {
+      throw new Error('oldChild not found');
+    }
+    newChild.parentNode = this;
+    this.children[index] = newChild;
+    oldChild.parentNode = null;
+    return oldChild;
   }
 
   remove() {

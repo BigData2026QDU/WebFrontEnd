@@ -265,6 +265,8 @@
 
   <script>
     let currentBindex = null;
+    let activeRealtimeToken = 0;
+    const realtimeTimers = new Map();
 
     // 退出登录
     function logout() {
@@ -291,6 +293,59 @@
         container: reportViewer,
         statusElement: reportStatus
       });
+
+      function stopRealtimeUpdates() {
+        activeRealtimeToken += 1;
+        realtimeTimers.forEach(timerId => clearTimeout(timerId));
+        realtimeTimers.clear();
+      }
+
+      function scheduleRealtimeBlock(bindex, block, token, delayMs) {
+        const blockId = block && block.id != null ? block.id : null;
+        if (!blockId) {
+          return;
+        }
+
+        const waitMs = Math.max(parseInt(block.refreshIntervalMs, 10) || 1000, 1000);
+        const timerId = setTimeout(async () => {
+          if (token !== activeRealtimeToken || bindex !== currentBindex) {
+            return;
+          }
+
+          try {
+            const req = new Request(`刷新报告块:${blockId}`, `reports/${bindex}/blocks/${blockId}`);
+            const resp = await req.get({ limit: 200 });
+            const payload = resp && resp.data && resp.data.data ? resp.data.data : resp.data;
+            renderer.replaceBlock(payload);
+
+            const latestBlocks = renderer.getRealtimeBlocks();
+            const latest = latestBlocks.find(item => String(item.id) === String(blockId));
+            if (latest) {
+              scheduleRealtimeBlock(bindex, latest, token, latest.refreshIntervalMs || waitMs);
+              return;
+            }
+          } catch (error) {
+            console.error('实时块刷新失败:', error);
+          }
+
+          scheduleRealtimeBlock(bindex, block, token, waitMs);
+        }, Math.max(delayMs || waitMs, 200));
+
+        realtimeTimers.set(String(blockId), timerId);
+      }
+
+      function startRealtimeUpdates(bindex) {
+        stopRealtimeUpdates();
+        const realtimeBlocks = renderer.getRealtimeBlocks();
+        if (!realtimeBlocks.length) {
+          return;
+        }
+
+        const token = activeRealtimeToken;
+        realtimeBlocks.forEach(block => {
+          scheduleRealtimeBlock(bindex, block, token, block.refreshIntervalMs || 1000);
+        });
+      }
 
       // 设置状态
       function setStatus(statusEl, type, text) {
@@ -366,6 +421,7 @@
 
       // 加载报告
       async function loadReport(bindex, forceRefresh = false) {
+        stopRealtimeUpdates();
         currentBindex = bindex;
         refreshReportBtn.disabled = false;
 
@@ -382,12 +438,8 @@
         setStatus(reportStatus, 'loading', `正在加载报告 ${bindex}...`);
 
         try {
-          const request = new Request(`加载报告:${bindex}`, 'api/report-test');
-          const response = await request.get({
-            bindex,
-            limit: 200,
-            refresh: forceRefresh ? 1 : undefined
-          });
+          const request = new Request(`加载报告:${bindex}`, `reports/${bindex}`);
+          const response = await request.get({ limit: 200, refresh: forceRefresh ? 1 : undefined });
           const data = response.data;
 
           // 显示原始 JSON
@@ -395,6 +447,7 @@
 
           // 渲染报告
           renderer.renderFromPayload(data);
+          startRealtimeUpdates(bindex);
 
           setStatus(reportStatus, 'success', `报告 ${bindex} 加载完成`);
         } catch (error) {
@@ -417,6 +470,8 @@
           loadReport(currentBindex, true);
         }
       });
+
+      window.addEventListener('beforeunload', stopRealtimeUpdates);
 
       // 初始加载
       loadReportList();
