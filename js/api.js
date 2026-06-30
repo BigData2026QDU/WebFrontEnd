@@ -120,45 +120,54 @@
 
   service.interceptors.request.use(
     config => {
-      const requestId = `req-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      config._requestId = requestId;
-      activeRequests++;
-      
-      const requestName = config.requestName || config.url;
-      addRequestToCapsule(requestId, requestName);
+      const showRequestCapsule = config.showRequestCapsule !== false && config.silent !== true;
+      config._showRequestCapsule = showRequestCapsule;
 
-      if (config.onUploadProgress) {
-        const originalOnUploadProgress = config.onUploadProgress;
-        config.onUploadProgress = progressEvent => {
-          const percentage = progressEvent.total ? (progressEvent.loaded * 1) / progressEvent.total : 0;
-          updateRequestCapsule(requestId, percentage);
-          originalOnUploadProgress(progressEvent);
-        };
-      } else {
-        config.onUploadProgress = progressEvent => {
+      if (showRequestCapsule) {
+        const requestId = `req-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        config._requestId = requestId;
+        activeRequests++;
+
+        const requestName = config.requestName || config.url;
+        addRequestToCapsule(requestId, requestName);
+
+        if (config.onUploadProgress) {
+          const originalOnUploadProgress = config.onUploadProgress;
+          config.onUploadProgress = progressEvent => {
             const percentage = progressEvent.total ? (progressEvent.loaded * 1) / progressEvent.total : 0;
             updateRequestCapsule(requestId, percentage);
-        };
+            originalOnUploadProgress(progressEvent);
+          };
+        } else {
+          config.onUploadProgress = progressEvent => {
+            const percentage = progressEvent.total ? (progressEvent.loaded * 1) / progressEvent.total : 0;
+            updateRequestCapsule(requestId, percentage);
+          };
+        }
       }
 
       return config;
     },
     error => {
       console.error('Request Error:', error);
-      Promise.reject(error);
+      return Promise.reject(error);
     }
   );
 
   service.interceptors.response.use(
     response => {
-      activeRequests--;
+      if (response.config && response.config._showRequestCapsule) {
+        activeRequests--;
+      }
       if (response.config._requestId) {
         removeRequestFromCapsule(response.config._requestId, 'success');
       }
       return response;
     },
     error => {
-      activeRequests--;
+      if (error.config && error.config._showRequestCapsule) {
+        activeRequests--;
+      }
       if (error.config && error.config._requestId) {
         removeRequestFromCapsule(error.config._requestId, 'error');
       }

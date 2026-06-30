@@ -80,3 +80,93 @@ test('ReportRenderer.replaceBlock updates only the target block content', async 
   assert.equal(paragraphs[1].textContent, '第二段');
   assert.equal(renderer.getRealtimeBlocks()[0].data, '新内容');
 });
+
+test('ReportRenderer replaces realtime chart data in place without reinitializing chart', async () => {
+  const env = createBrowserEnvironment();
+  env.window.Request = class Request {};
+  env.window.ChartParser = {
+    validate() {
+      return { valid: true, errors: [] };
+    },
+    parse(chart) {
+      return { columns: chart.columns, rows: chart.rows };
+    },
+    parsePie(chart) {
+      return { points: chart.rows };
+    },
+    parseScatter(chart) {
+      return { points: chart.rows };
+    }
+  };
+  env.window.ChartFactory = {
+    create(type, parsedData) {
+      return { type, parsedData };
+    }
+  };
+
+  const setOptionCalls = [];
+  let initCalls = 0;
+  let disposeCalls = 0;
+  env.window.echarts = {
+    init() {
+      initCalls += 1;
+      return {
+        setOption(option) {
+          setOptionCalls.push(option);
+        },
+        dispose() {
+          disposeCalls += 1;
+        }
+      };
+    }
+  };
+
+  const container = env.document.createElement('div');
+  env.document.body.appendChild(container);
+
+  await loadBrowserScript(scriptPath, env, ['ReportRenderer']);
+
+  const renderer = new env.window.ReportRenderer({ container });
+  renderer.renderFromPayload({
+    report: {
+      title: '实时图表报告',
+      sections: [
+        {
+          id: 7,
+          type: 'chart',
+          realtime: true,
+          data: {
+            title: 'family_impact_analysis',
+            chartType: 'bar',
+            columns: ['name', 'value'],
+            rows: [['A', 1]]
+          }
+        }
+      ]
+    }
+  });
+
+  env.runTimers();
+  assert.equal(initCalls, 1);
+  assert.equal(setOptionCalls.length, 1);
+
+  const updated = renderer.replaceBlock({
+    id: 7,
+    type: 'chart',
+    realtime: true,
+    data: {
+      title: 'family_impact_analysis',
+      chartType: 'bar',
+      columns: ['name', 'value'],
+      rows: [['A', 2]]
+    }
+  });
+
+  assert.equal(updated, true);
+  assert.equal(initCalls, 1, '原位更新不应重新 init 图表');
+  assert.equal(disposeCalls, 0, '原位更新不应先 dispose 图表');
+  assert.equal(setOptionCalls.length, 2, '应复用现有实例再次 setOption');
+  assert.equal(setOptionCalls[1].animation, false);
+  assert.equal(setOptionCalls[1].animationDuration, 0);
+  assert.equal(setOptionCalls[1].animationDurationUpdate, 0);
+});

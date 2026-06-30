@@ -78,3 +78,29 @@ test('api.js marks failed requests as error', async () => {
     console.error = originalError;
   }
 });
+
+test('api.js supports silent requests without showing request capsule', async () => {
+  const env = createBrowserEnvironment({
+    pathname: '/hivehbase/html/show-report.html'
+  });
+  const axiosStub = createAxiosStub();
+  env.window.axios = axiosStub.axios;
+
+  await loadBrowserScript(scriptPath, env);
+
+  const requestHandler = axiosStub.requestHandlers[0];
+  const responseHandler = axiosStub.responseSuccessHandlers[0];
+  const config = requestHandler({
+    url: '/reports/1/blocks/2',
+    requestName: '实时刷新',
+    silent: true,
+    showRequestCapsule: false
+  });
+
+  assert.equal(config._showRequestCapsule, false);
+  assert.equal(config._requestId, undefined);
+  assert.equal(env.document.getElementById('request-capsule-container'), null);
+
+  responseHandler({ config });
+  assert.equal(env.document.getElementById('request-capsule-container'), null);
+});

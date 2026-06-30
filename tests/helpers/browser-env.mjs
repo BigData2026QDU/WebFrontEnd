@@ -352,6 +352,12 @@ export function createBrowserEnvironment(options = {}) {
   };
 
   window.window = window;
+  window.getComputedStyle = target => ({
+    getPropertyValue(name) {
+      return (target && target.style && target.style[name]) ? target.style[name] : '';
+    }
+  });
+  window.atob = value => Buffer.from(String(value), 'base64').toString('binary');
   if (apiBaseUrl !== undefined) {
     window.API_BASE_URL = apiBaseUrl;
   }
@@ -398,6 +404,12 @@ export async function loadBrowserScript(scriptPath, env, expose = []) {
     document: env.document,
     localStorage: env.localStorage,
     axios: env.window.axios,
+    Request: env.window.Request,
+    ChartParser: env.window.ChartParser,
+    ChartFactory: env.window.ChartFactory,
+    echarts: env.window.echarts,
+    getComputedStyle: env.window.getComputedStyle,
+    atob: env.window.atob,
     console,
     setTimeout: env.window.setTimeout,
     clearTimeout: env.window.clearTimeout,

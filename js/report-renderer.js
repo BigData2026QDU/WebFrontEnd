@@ -327,6 +327,17 @@
         return false;
       }
 
+      const index = this.currentBlocks.findIndex(block => this.getBlockKey(block) === key);
+      const currentBlock = index >= 0 ? this.currentBlocks[index] : null;
+
+      if (currentBlock && currentBlock.type === 'chart' && normalized.type === 'chart') {
+        const updatedInPlace = this.updateChartBlockInPlace(key, normalized);
+        if (updatedInPlace) {
+          this.currentBlocks[index] = normalized;
+          return true;
+        }
+      }
+
       const currentEl = this.blockElements.get(key);
       if (!currentEl || !currentEl.parentNode || !currentEl.parentNode.replaceChild) {
         return false;
@@ -337,11 +348,64 @@
       currentEl.parentNode.replaceChild(nextEl, currentEl);
       this.blockElements.set(key, nextEl);
 
-      const index = this.currentBlocks.findIndex(block => this.getBlockKey(block) === key);
       if (index >= 0) {
         this.currentBlocks[index] = normalized;
       }
       return true;
+    }
+
+    updateChartBlockInPlace(blockKey, normalized) {
+      const chartInfos = this.chartInstances.filter(item => item.blockKey === blockKey);
+      if (!chartInfos.length) {
+        return false;
+      }
+
+      const charts = (normalized.data && typeof normalized.data === 'object' && Array.isArray(normalized.data.charts))
+        ? normalized.data.charts
+        : [normalized.data];
+
+      if (charts.length !== chartInfos.length || charts.some(chart => !chart || typeof chart !== 'object')) {
+        return false;
+      }
+
+      try {
+        chartInfos.forEach((chartInfo, index) => {
+          const nextChart = charts[index];
+          chartInfo.chart = nextChart;
+          chartInfo.canvas.style.height = nextChart.height || chartInfo.canvas.style.height || '400px';
+          this.syncChartHeader(chartInfo, nextChart);
+          const option = this.buildChartOption(nextChart, { disableAnimation: true });
+          chartInfo.instance.setOption(option, true);
+        });
+        return true;
+      } catch (error) {
+        console.error('实时图表原位刷新失败，将回退到整块替换:', error);
+        return false;
+      }
+    }
+
+    syncChartHeader(chartInfo, nextChart) {
+      if (!chartInfo || !chartInfo.headerRow) {
+        return;
+      }
+
+      const hasTitle = !!(nextChart && nextChart.title);
+      if (!hasTitle && chartInfo.titleElement) {
+        chartInfo.titleElement.remove();
+        chartInfo.titleElement = null;
+        return;
+      }
+
+      if (hasTitle && !chartInfo.titleElement) {
+        const title = document.createElement('div');
+        title.className = 'chart-title';
+        chartInfo.headerRow.insertBefore(title, chartInfo.headerRow.firstChild || null);
+        chartInfo.titleElement = title;
+      }
+
+      if (chartInfo.titleElement) {
+        chartInfo.titleElement.textContent = nextChart.title;
+      }
     }
 
     /**
@@ -627,11 +691,12 @@
       const headerRow = document.createElement('div');
       headerRow.className = 'chart-header';
 
+      let titleElement = null;
       if (chart.title) {
-        const title = document.createElement('div');
-        title.className = 'chart-title';
-        title.textContent = chart.title;
-        headerRow.appendChild(title);
+        titleElement = document.createElement('div');
+        titleElement.className = 'chart-title';
+        titleElement.textContent = chart.title;
+        headerRow.appendChild(titleElement);
       }
 
       // 创建图表类型选择器
@@ -659,6 +724,8 @@
               chart,
               canvas,
               typeSelector,
+              titleElement,
+              headerRow,
               blockKey: this.getBlockKey(blockMeta)
             });
           } catch (error) {
@@ -766,7 +833,7 @@
     /**
      * 构建图表配置（仅支持新格式）
      */
-    buildChartOption(chart) {
+    buildChartOption(chart, options = {}) {
       if (!window.ChartParser || !window.ChartFactory) {
         throw new Error('图表模块未加载（ChartParser/ChartFactory 缺失），无法渲染图表。');
       }
@@ -793,7 +860,13 @@
 
       // 生成图表配置
       const chartOptions = config.chartOptions || {};
-      return window.ChartFactory.create(chartType, parsedData, colors, chartOptions);
+      const option = window.ChartFactory.create(chartType, parsedData, colors, chartOptions);
+      if (options.disableAnimation) {
+        option.animation = false;
+        option.animationDuration = 0;
+        option.animationDurationUpdate = 0;
+      }
+      return option;
     }
 
     /**

@@ -314,7 +314,7 @@
 
           try {
             const req = new Request(`刷新报告块:${blockId}`, `reports/${bindex}/blocks/${blockId}`);
-            const resp = await req.get({ limit: 200 });
+            const resp = await req.get({ limit: 200 }, { silent: true, showRequestCapsule: false });
             const payload = resp && resp.data && resp.data.data ? resp.data.data : resp.data;
             renderer.replaceBlock(payload);
 
